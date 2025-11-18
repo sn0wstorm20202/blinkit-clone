@@ -11,7 +11,7 @@ import CartSidebar from "@/components/modals/cart-sidebar";
 import Image from "next/image";
 
 interface Address {
-  id: number;
+  id: string;
   fullName: string;
   phoneNumber: string;
   addressLine1: string;
@@ -23,11 +23,11 @@ interface Address {
 }
 
 interface CartItem {
-  id: number;
-  productId: number;
+  id: string;
+  productId: string;
   quantity: number;
   product: {
-    id: number;
+    id: string;
     name: string;
     imageUrl: string;
     quantity: string;
@@ -45,7 +45,7 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { data: session, isPending } = useSession();
   const [addresses, setAddresses] = useState<Address[]>([]);
-  const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [cartData, setCartData] = useState<CartData | null>(null);
   const [isLoadingAddresses, setIsLoadingAddresses] = useState(true);
   const [isLoadingCart, setIsLoadingCart] = useState(true);

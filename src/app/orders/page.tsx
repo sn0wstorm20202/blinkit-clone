@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import CartSidebar from "@/components/modals/cart-sidebar";
 
 interface Order {
-  id: number;
+  id: string;
   totalAmount: number;
   deliveryCharge: number;
   handlingCharge: number;

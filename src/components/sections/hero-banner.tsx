@@ -5,10 +5,11 @@ import Link from 'next/link';
 
 const HeroBanner = () => {
   const bannerImageUrl = "https://slelguoygbfzlpylpxfs.supabase.co/storage/v1/object/public/test-clones/46beb3bf-c706-4916-ad59-8d1e7a2aeb9c-blinkit-com/assets/images/Group-33704-1.jpg";
+  const paanCategoryPath = `/category/${encodeURIComponent("Paan Corner")}`;
 
   return (
     <section className="mb-6">
-      <Link href="#" passHref legacyBehavior>
+      <Link href={paanCategoryPath} passHref legacyBehavior>
         <a className="block cursor-pointer">
           <div className="relative flex items-center h-[235px] rounded-2xl overflow-hidden">
             <Image

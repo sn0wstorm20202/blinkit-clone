@@ -1,37 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
-import { cart, cartItems, products, session } from '@/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { supabaseAsUser, getUserFromRequest } from '@/lib/supabase/admin';
 
-async function getUserFromToken(request: NextRequest): Promise<string | null> {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const token = authHeader.substring(7);
-  
-  try {
-    const sessions = await db.select()
-      .from(session)
-      .where(eq(session.token, token))
-      .limit(1);
-
-    if (sessions.length === 0) {
-      return null;
-    }
-
-    const userSession = sessions[0];
-    
-    if (userSession.expiresAt < new Date()) {
-      return null;
-    }
-
-    return userSession.userId;
-  } catch (error) {
-    console.error('Token validation error:', error);
-    return null;
-  }
+async function requireAuth(request: NextRequest) {
+  const { user, token } = await getUserFromRequest(request);
+  if (!user || !token) return null;
+  return { user, token } as const;
 }
 
 export async function PUT(
@@ -39,8 +12,8 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const userId = await getUserFromToken(request);
-    if (!userId) {
+    const auth = await requireAuth(request);
+    if (!auth) {
       return NextResponse.json(
         { error: 'Authentication required', code: 'UNAUTHORIZED' },
         { status: 401 }
@@ -48,14 +21,12 @@ export async function PUT(
     }
 
     const id = params.id;
-    if (!id || isNaN(parseInt(id))) {
+    if (!id) {
       return NextResponse.json(
         { error: 'Valid ID is required', code: 'INVALID_ID' },
         { status: 400 }
       );
     }
-
-    const cartItemId = parseInt(id);
 
     const body = await request.json();
     const { quantity } = body;
@@ -74,76 +45,57 @@ export async function PUT(
       );
     }
 
-    const existingCartItem = await db.select()
-      .from(cartItems)
-      .where(eq(cartItems.id, cartItemId))
-      .limit(1);
-
-    if (existingCartItem.length === 0) {
+    const sb = supabaseAsUser(auth.token);
+    const { data: item, error: itemErr } = await sb
+      .from('cart_items')
+      .select('id, product_id')
+      .eq('id', id)
+      .eq('user_id', auth.user.id)
+      .maybeSingle();
+    if (itemErr) {
+      console.error('Fetch cart item error:', itemErr);
+    }
+    if (!item) {
       return NextResponse.json(
         { error: 'Cart item not found', code: 'NOT_FOUND' },
         { status: 404 }
       );
     }
 
-    const cartId = existingCartItem[0].cartId;
-
-    const userCart = await db.select()
-      .from(cart)
-      .where(and(
-        eq(cart.id, cartId),
-        eq(cart.userId, userId)
-      ))
-      .limit(1);
-
-    if (userCart.length === 0) {
-      return NextResponse.json(
-        { error: 'Cart item not found', code: 'NOT_FOUND' },
-        { status: 404 }
-      );
+    const { data: updated, error: updErr } = await sb
+      .from('cart_items')
+      .update({ quantity })
+      .eq('id', id)
+      .eq('user_id', auth.user.id)
+      .select('id, product_id, quantity')
+      .single();
+    if (updErr) {
+      console.error('Update cart item error:', updErr);
+      return NextResponse.json({ error: updErr.message }, { status: 500 });
     }
 
-    const updatedAt = new Date().toISOString();
-
-    const updatedCartItem = await db.update(cartItems)
-      .set({
-        quantity,
-        updatedAt
-      })
-      .where(eq(cartItems.id, cartItemId))
-      .returning();
-
-    await db.update(cart)
-      .set({ updatedAt })
-      .where(eq(cart.id, cartId));
-
-    const productDetails = await db.select()
-      .from(products)
-      .where(eq(products.id, updatedCartItem[0].productId))
-      .limit(1);
-
-    if (productDetails.length === 0) {
-      return NextResponse.json(
-        { error: 'Product not found', code: 'PRODUCT_NOT_FOUND' },
-        { status: 404 }
-      );
+    const { data: product, error: prodErr } = await sb
+      .from('products')
+      .select('id, name, image_url, weight, price')
+      .eq('id', updated.product_id)
+      .maybeSingle();
+    if (prodErr || !product) {
+      return NextResponse.json({ error: prodErr?.message || 'Product not found', code: 'PRODUCT_NOT_FOUND' }, { status: 404 });
     }
-
-    const product = productDetails[0];
 
     return NextResponse.json({
-      id: updatedCartItem[0].id,
-      cartId: updatedCartItem[0].cartId,
-      productId: updatedCartItem[0].productId,
-      quantity: updatedCartItem[0].quantity,
+      id: updated.id,
+      cartId: 0,
+      productId: updated.product_id,
+      quantity: updated.quantity,
       product: {
         id: product.id,
         name: product.name,
-        imageUrl: product.imageUrl,
-        quantity: product.quantity,
-        price: product.price
+        imageUrl: product.image_url ?? '',
+        quantity: product.weight ?? '',
+        price: Number(product.price ?? 0)
       },
-      updatedAt: updatedCartItem[0].updatedAt
+      updatedAt: null
     }, { status: 200 });
 
   } catch (error) {
@@ -160,8 +112,8 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const userId = await getUserFromToken(request);
-    if (!userId) {
+    const auth = await requireAuth(request);
+    if (!auth) {
       return NextResponse.json(
         { error: 'Authentication required', code: 'UNAUTHORIZED' },
         { status: 401 }
@@ -169,56 +121,28 @@ export async function DELETE(
     }
 
     const id = params.id;
-    if (!id || isNaN(parseInt(id))) {
+    if (!id) {
       return NextResponse.json(
         { error: 'Valid ID is required', code: 'INVALID_ID' },
         { status: 400 }
       );
     }
-
-    const cartItemId = parseInt(id);
-
-    const existingCartItem = await db.select()
-      .from(cartItems)
-      .where(eq(cartItems.id, cartItemId))
-      .limit(1);
-
-    if (existingCartItem.length === 0) {
-      return NextResponse.json(
-        { error: 'Cart item not found', code: 'NOT_FOUND' },
-        { status: 404 }
-      );
+    const sb = supabaseAsUser(auth.token);
+    const { data: deleted, error: delErr } = await sb
+      .from('cart_items')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', auth.user.id)
+      .select('id')
+      .single();
+    if (delErr) {
+      console.error('Delete cart item error:', delErr);
+      return NextResponse.json({ error: delErr.message }, { status: 500 });
     }
-
-    const cartId = existingCartItem[0].cartId;
-
-    const userCart = await db.select()
-      .from(cart)
-      .where(and(
-        eq(cart.id, cartId),
-        eq(cart.userId, userId)
-      ))
-      .limit(1);
-
-    if (userCart.length === 0) {
-      return NextResponse.json(
-        { error: 'Cart item not found', code: 'NOT_FOUND' },
-        { status: 404 }
-      );
-    }
-
-    const deleted = await db.delete(cartItems)
-      .where(eq(cartItems.id, cartItemId))
-      .returning();
-
-    const updatedAt = new Date().toISOString();
-    await db.update(cart)
-      .set({ updatedAt })
-      .where(eq(cart.id, cartId));
 
     return NextResponse.json({
       message: 'Item removed from cart successfully',
-      cartItemId: deleted[0].id
+      cartItemId: deleted.id
     }, { status: 200 });
 
   } catch (error) {

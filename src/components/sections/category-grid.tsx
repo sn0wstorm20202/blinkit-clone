@@ -32,7 +32,7 @@ const CategoryGrid = () => {
           {categories.map((category) => (
             <Link
               key={category.name}
-              href="#"
+              href={`/category/${encodeURIComponent(category.name)}`}
               className="block transition-transform duration-200 ease-in-out hover:scale-[1.02]"
             >
               <Image

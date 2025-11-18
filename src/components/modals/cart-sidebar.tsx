@@ -10,12 +10,12 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 interface CartItem {
-  id: number;
+  id: string;
   cartId: number;
-  productId: number;
+  productId: string;
   quantity: number;
   product: {
-    id: number;
+    id: string;
     name: string;
     imageUrl: string;
     quantity: string;
@@ -40,7 +40,7 @@ interface CartSidebarProps {
 const CartSidebar = ({ isOpen, onClose }: CartSidebarProps) => {
   const [cartData, setCartData] = useState<CartData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [updatingItems, setUpdatingItems] = useState<Set<number>>(new Set());
+  const [updatingItems, setUpdatingItems] = useState<Set<string>>(new Set());
   const { data: session } = useSession();
   const router = useRouter();
 
@@ -85,7 +85,7 @@ const CartSidebar = ({ isOpen, onClose }: CartSidebarProps) => {
     }
   };
 
-  const updateQuantity = async (itemId: number, newQuantity: number) => {
+  const updateQuantity = async (itemId: string, newQuantity: number) => {
     if (newQuantity < 1) {
       await removeItem(itemId);
       return;
@@ -120,7 +120,7 @@ const CartSidebar = ({ isOpen, onClose }: CartSidebarProps) => {
     }
   };
 
-  const removeItem = async (itemId: number) => {
+  const removeItem = async (itemId: string) => {
     setUpdatingItems(prev => new Set(prev).add(itemId));
     
     try {

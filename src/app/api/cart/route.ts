@@ -1,108 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
-import { cart, cartItems, products, session } from '@/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { getUserFromRequest, supabaseAsUser } from '@/lib/supabase/admin';
 
 async function authenticateRequest(request: NextRequest) {
-  const authHeader = request.headers.get('Authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const token = authHeader.substring(7);
-  
-  try {
-    const sessionResult = await db.select()
-      .from(session)
-      .where(eq(session.token, token))
-      .limit(1);
-
-    if (sessionResult.length === 0) {
-      return null;
-    }
-
-    const userSession = sessionResult[0];
-    
-    // Check if session is expired
-    if (userSession.expiresAt < new Date()) {
-      return null;
-    }
-
-    return userSession.userId;
-  } catch (error) {
-    console.error('Authentication error:', error);
-    return null;
-  }
+  const { user, token } = await getUserFromRequest(request);
+  if (!user || !token) return null;
+  return { user, token } as const;
 }
 
 export async function GET(request: NextRequest) {
   try {
-    // Authenticate user
-    const userId = await authenticateRequest(request);
-    
-    if (!userId) {
+    const auth = await authenticateRequest(request);
+    if (!auth) {
       return NextResponse.json({ 
         error: 'Unauthorized', 
         code: 'UNAUTHORIZED' 
       }, { status: 401 });
     }
-
-    // Find or create user's cart
-    let userCart = await db.select()
-      .from(cart)
-      .where(eq(cart.userId, userId))
-      .limit(1);
-
-    if (userCart.length === 0) {
-      // Create new cart for user
-      const newCart = await db.insert(cart)
-        .values({
-          userId: userId,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        })
-        .returning();
-      
-      userCart = newCart;
+    const sb = supabaseAsUser(auth.token);
+    const { data, error } = await sb
+      .from('cart_items')
+      .select('id, quantity, created_at, product:products(id, name, image_url, weight, price)')
+      .eq('user_id', auth.user.id);
+    if (error) {
+      console.error('Cart fetch error:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    const cartId = userCart[0].id;
-
-    // Get all cart items with product details
-    const items = await db.select({
-      id: cartItems.id,
-      cartId: cartItems.cartId,
-      productId: cartItems.productId,
-      quantity: cartItems.quantity,
-      createdAt: cartItems.createdAt,
-      updatedAt: cartItems.updatedAt,
+    const items = (data ?? []).map((row: any) => ({
+      id: row.id,
+      cartId: 0,
+      productId: row.product?.id,
+      quantity: row.quantity,
       product: {
-        id: products.id,
-        name: products.name,
-        imageUrl: products.imageUrl,
-        quantity: products.quantity,
-        price: products.price,
-        deliveryTime: products.deliveryTime
-      }
-    })
-    .from(cartItems)
-    .innerJoin(products, eq(cartItems.productId, products.id))
-    .where(eq(cartItems.cartId, cartId));
+        id: row.product?.id,
+        name: row.product?.name,
+        imageUrl: row.product?.image_url ?? '',
+        quantity: row.product?.weight ?? '',
+        price: Number(row.product?.price ?? 0),
+        deliveryTime: '8 mins',
+      },
+    }));
 
-    // Calculate total amount
-    const totalAmount = items.reduce((sum, item) => {
-      return sum + (item.product.price * item.quantity);
-    }, 0);
-
-    const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
+    const totalAmount = items.reduce((sum: number, item: any) => sum + item.product.price * item.quantity, 0);
+    const itemCount = items.reduce((sum: number, item: any) => sum + item.quantity, 0);
 
     return NextResponse.json({
-      cartId: cartId,
-      userId: userId,
-      items: items,
-      totalAmount: totalAmount,
-      itemCount: itemCount
+      cartId: 0,
+      userId: auth.user.id,
+      items,
+      totalAmount,
+      itemCount,
     }, { status: 200 });
 
   } catch (error) {
@@ -115,39 +62,26 @@ export async function GET(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    // Authenticate user
-    const userId = await authenticateRequest(request);
-    
-    if (!userId) {
+    const auth = await authenticateRequest(request);
+    if (!auth) {
       return NextResponse.json({ 
         error: 'Unauthorized', 
         code: 'UNAUTHORIZED' 
       }, { status: 401 });
     }
-
-    // Find user's cart
-    const userCart = await db.select()
-      .from(cart)
-      .where(eq(cart.userId, userId))
-      .limit(1);
-
-    if (userCart.length === 0) {
-      return NextResponse.json({ 
-        error: 'Cart not found', 
-        code: 'CART_NOT_FOUND' 
-      }, { status: 404 });
+    const sb = supabaseAsUser(auth.token);
+    const { data, error } = await sb
+      .from('cart_items')
+      .delete()
+      .eq('user_id', auth.user.id)
+      .select('id');
+    if (error) {
+      console.error('Cart clear error:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
-
-    const cartId = userCart[0].id;
-
-    // Delete all cart items
-    const deleted = await db.delete(cartItems)
-      .where(eq(cartItems.cartId, cartId))
-      .returning();
-
     return NextResponse.json({
       message: 'Cart cleared successfully',
-      deletedCount: deleted.length
+      deletedCount: (data ?? []).length,
     }, { status: 200 });
 
   } catch (error) {

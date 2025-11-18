@@ -6,15 +6,16 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSession } from '@/lib/auth-client';
 import { useRouter } from 'next/navigation';
+import { safeProductImageUrl } from '@/lib/utils';
 
 interface Product {
-  id: number;
+  id: string;
   name: string;
   imageUrl: string;
   quantity: string;
   price: number;
   deliveryTime: string;
-  categoryId: number;
+  categoryId: string;
   categoryName: string;
 }
 
@@ -23,7 +24,7 @@ interface ProductCarouselProps {
   title?: string;
 }
 
-const ProductCard = ({ product, onAddToCart }: { product: Product; onAddToCart: (productId: number) => Promise<void> }) => {
+const ProductCard = ({ product, onAddToCart }: { product: Product; onAddToCart: (productId: string) => Promise<void> }) => {
   const [isAdding, setIsAdding] = useState(false);
 
   const handleAdd = async () => {
@@ -39,7 +40,7 @@ const ProductCard = ({ product, onAddToCart }: { product: Product; onAddToCart: 
     <div className="flex-shrink-0 w-[179px] bg-card border border-border rounded-xl p-3 shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-all duration-200 ease-linear hover:scale-[1.02] hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)]">
       <div className="relative">
         <Image
-          src={product.imageUrl}
+          src={safeProductImageUrl(product.imageUrl, product.name)}
           alt={product.name}
           width={140}
           height={140}
@@ -98,8 +99,10 @@ const ProductCarousel = ({ categoryId, title }: ProductCarouselProps) => {
     const fetchProducts = async () => {
       try {
         setIsLoading(true);
-        const url = categoryId 
-          ? `/api/products?category_id=${categoryId}&limit=20`
+        const url = title
+          ? `/api/products?category_name=${encodeURIComponent(title)}&limit=20`
+          : categoryId
+          ? `/api/products?category_id=${encodeURIComponent(String(categoryId))}&limit=20`
           : '/api/products?limit=20';
         
         const response = await fetch(url);
@@ -115,7 +118,7 @@ const ProductCarousel = ({ categoryId, title }: ProductCarouselProps) => {
       }
     };
 
-    const handleAddToCart = async (productId: number) => {
+    const handleAddToCart = async (productId: string) => {
       if (!session?.user) {
         toast.error('Please login to add items to cart');
         router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);

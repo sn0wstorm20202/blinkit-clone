@@ -9,11 +9,12 @@ import { Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { useSession } from "@/lib/auth-client";
 import CartSidebar from "@/components/modals/cart-sidebar";
+import { safeProductImageUrl } from "@/lib/utils";
 
 interface Product {
-  id: number;
+  id: string;
   name: string;
-  categoryId: number;
+  categoryId: string;
   categoryName: string;
   imageUrl: string;
   quantity: string;
@@ -77,7 +78,7 @@ export default function SearchPage() {
     router.push("/s");
   };
 
-  const handleAddToCart = async (productId: number) => {
+  const handleAddToCart = async (productId: string) => {
     if (!session?.user) {
       toast.error("Please login to add items to cart");
       router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
@@ -170,7 +171,7 @@ export default function SearchPage() {
                   >
                     <div className="relative w-full aspect-square mb-3">
                       <Image
-                        src={product.imageUrl}
+                        src={safeProductImageUrl(product.imageUrl, product.name)}
                         alt={product.name}
                         fill
                         className="object-contain"

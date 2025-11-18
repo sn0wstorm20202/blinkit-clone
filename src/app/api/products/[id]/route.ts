@@ -1,47 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
-import { products, categories } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { getSupabaseServer } from '@/lib/supabase/server';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = params;
-
-    // Validate ID is a valid integer
-    if (!id || isNaN(parseInt(id))) {
-      return NextResponse.json(
-        {
-          error: 'Valid ID is required',
-          code: 'INVALID_ID',
-        },
-        { status: 400 }
-      );
+    const id = params.id;
+    if (!id) {
+      return NextResponse.json({ error: 'ID is required', code: 'INVALID_ID' }, { status: 400 });
     }
 
-    const productId = parseInt(id);
+    const supabase = getSupabaseServer();
+    const { data, error } = await supabase
+      .from('products')
+      .select('id,name,image_url,weight,price,created_at,category_id,categories(name)')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) {
+      console.error('Supabase product error:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
-    // Query product with category join
-    const result = await db
-      .select({
-        id: products.id,
-        name: products.name,
-        categoryId: products.categoryId,
-        categoryName: categories.name,
-        imageUrl: products.imageUrl,
-        quantity: products.quantity,
-        price: products.price,
-        deliveryTime: products.deliveryTime,
-        createdAt: products.createdAt,
-      })
-      .from(products)
-      .innerJoin(categories, eq(products.categoryId, categories.id))
-      .where(eq(products.id, productId))
-      .limit(1);
-
-    if (result.length === 0) {
+    if (!data) {
       return NextResponse.json(
         {
           error: 'Product not found',
@@ -51,7 +32,19 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(result[0], { status: 200 });
+    const result = {
+      id: data.id,
+      name: data.name,
+      categoryId: data.category_id,
+      categoryName: (data as any).categories?.name ?? null,
+      imageUrl: data.image_url ?? '',
+      quantity: data.weight ?? '',
+      price: Number(data.price ?? 0),
+      deliveryTime: '8 mins',
+      createdAt: data.created_at,
+    };
+
+    return NextResponse.json(result, { status: 200 });
   } catch (error) {
     console.error('GET product error:', error);
     return NextResponse.json(

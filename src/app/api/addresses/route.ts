@@ -1,76 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
-import { addresses, session } from '@/db/schema';
-import { eq, desc, and } from 'drizzle-orm';
+import { supabaseAsUser, getUserFromRequest } from '@/lib/supabase/admin';
 
 async function authenticateRequest(request: NextRequest) {
-  const authHeader = request.headers.get('Authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const token = authHeader.substring(7);
-
-  try {
-    const sessionRecord = await db.select()
-      .from(session)
-      .where(eq(session.token, token))
-      .limit(1);
-
-    if (sessionRecord.length === 0) {
-      return null;
-    }
-
-    const userSession = sessionRecord[0];
-
-    // Check if session is expired
-    const now = new Date();
-    if (userSession.expiresAt < now) {
-      return null;
-    }
-
-    return userSession;
-  } catch (error) {
-    console.error('Authentication error:', error);
-    return null;
-  }
+  const { user, token } = await getUserFromRequest(request);
+  if (!user || !token) return null;
+  return { user, token } as const;
 }
 
 export async function GET(request: NextRequest) {
   try {
     // Authenticate request
-    const userSession = await authenticateRequest(request);
+    const auth = await authenticateRequest(request);
     
-    if (!userSession) {
+    if (!auth) {
       return NextResponse.json(
         { error: 'Unauthorized', code: 'UNAUTHORIZED' },
         { status: 401 }
       );
     }
 
-    // Get all addresses for the authenticated user
-    const userAddresses = await db.select()
-      .from(addresses)
-      .where(eq(addresses.userId, userSession.userId))
-      .orderBy(desc(addresses.isDefault), desc(addresses.createdAt));
+    const supabase = supabaseAsUser(auth.token);
+    const { data, error } = await supabase
+      .from('addresses')
+      .select('id, user_id, full_name, phone_number, address_line1, address_line2, city, state, postal_code, is_default, created_at')
+      .eq('user_id', auth.user.id)
+      .order('is_default', { ascending: false })
+      .order('created_at', { ascending: false });
+    if (error) {
+      console.error('Addresses fetch error:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
-    // Transform to match response structure with proper boolean conversion
-    const formattedAddresses = userAddresses.map(addr => ({
+    const formatted = (data ?? []).map((addr: any) => ({
       id: addr.id,
-      userId: addr.userId,
-      fullName: addr.fullName,
-      phoneNumber: addr.phoneNumber,
-      addressLine1: addr.addressLine1,
-      addressLine2: addr.addressLine2,
+      userId: addr.user_id,
+      fullName: addr.full_name,
+      phoneNumber: addr.phone_number,
+      addressLine1: addr.address_line1,
+      addressLine2: addr.address_line2,
       city: addr.city,
       state: addr.state,
-      postalCode: addr.postalCode,
-      isDefault: Boolean(addr.isDefault),
-      createdAt: addr.createdAt
+      postalCode: addr.postal_code,
+      isDefault: Boolean(addr.is_default),
+      createdAt: addr.created_at,
     }));
 
-    return NextResponse.json(formattedAddresses, { status: 200 });
+    return NextResponse.json(formatted, { status: 200 });
 
   } catch (error) {
     console.error('GET error:', error);
@@ -84,9 +59,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // Authenticate request
-    const userSession = await authenticateRequest(request);
+    const auth = await authenticateRequest(request);
     
-    if (!userSession) {
+    if (!auth) {
       return NextResponse.json(
         { error: 'Unauthorized', code: 'UNAUTHORIZED' },
         { status: 401 }
@@ -127,42 +102,50 @@ export async function POST(request: NextRequest) {
     const postalCode = postal_code.trim();
     const isDefault = Boolean(is_default);
 
-    // If this is set as default, update all other addresses to non-default
+    const supabase = supabaseAsUser(auth.token);
     if (isDefault) {
-      await db.update(addresses)
-        .set({ isDefault: false })
-        .where(eq(addresses.userId, userSession.userId));
+      const { error: clearErr } = await supabase
+        .from('addresses')
+        .update({ is_default: false })
+        .eq('user_id', auth.user.id);
+      if (clearErr) {
+        console.error('Clear default error:', clearErr);
+      }
     }
 
-    // Create new address
-    const newAddress = await db.insert(addresses)
-      .values({
-        userId: userSession.userId,
-        fullName,
-        phoneNumber,
-        addressLine1,
-        addressLine2: addressLine2Value,
+    const { data, error } = await supabase
+      .from('addresses')
+      .insert({
+        user_id: auth.user.id,
+        full_name: fullName,
+        phone_number: phoneNumber,
+        address_line1: addressLine1,
+        address_line2: addressLine2Value,
         city: cityValue,
         state: stateValue,
-        postalCode,
-        isDefault,
-        createdAt: new Date().toISOString()
+        postal_code: postalCode,
+        is_default: isDefault,
       })
-      .returning();
+      .select('*')
+      .single();
 
-    // Format response with proper boolean conversion
+    if (error) {
+      console.error('Create address error:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
     const formattedAddress = {
-      id: newAddress[0].id,
-      userId: newAddress[0].userId,
-      fullName: newAddress[0].fullName,
-      phoneNumber: newAddress[0].phoneNumber,
-      addressLine1: newAddress[0].addressLine1,
-      addressLine2: newAddress[0].addressLine2,
-      city: newAddress[0].city,
-      state: newAddress[0].state,
-      postalCode: newAddress[0].postalCode,
-      isDefault: Boolean(newAddress[0].isDefault),
-      createdAt: newAddress[0].createdAt
+      id: data.id,
+      userId: data.user_id,
+      fullName: data.full_name,
+      phoneNumber: data.phone_number,
+      addressLine1: data.address_line1,
+      addressLine2: data.address_line2,
+      city: data.city,
+      state: data.state,
+      postalCode: data.postal_code,
+      isDefault: Boolean(data.is_default),
+      createdAt: data.created_at,
     };
 
     return NextResponse.json(formattedAddress, { status: 201 });

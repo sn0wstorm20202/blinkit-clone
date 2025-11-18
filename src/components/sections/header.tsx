@@ -179,19 +179,13 @@ export default function Header({ onCartClick }: HeaderProps) {
         <div className="hidden flex-1 items-center justify-center px-8 lg:flex">
           <form
             onSubmit={handleSearchSubmit}
-            className="relative flex h-12 w-full max-w-[630px] flex-row items-center rounded-xl bg-surface-gray px-4 cursor-text"
-            onClick={(e) => {
-              if (e.target === e.currentTarget) {
-                handleSearchClick();
-              }
-            }}
+            className="relative flex h-12 w-full max-w-[630px] flex-row items-center rounded-xl bg-surface-gray px-4"
           >
             <Search className="h-5 w-5 text-text-tertiary" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={handleSearchClick}
               placeholder={`Search "${searchPlaceholders[currentPlaceholderIndex]}"`}
               className="ml-3 h-6 w-full flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-secondary focus:outline-none"
             />

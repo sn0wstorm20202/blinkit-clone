@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
-import { products, categories } from '@/db/schema';
-import { eq, like, and, desc } from 'drizzle-orm';
+import { getSupabaseServer } from '@/lib/supabase/server';
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,6 +7,7 @@ export async function GET(request: NextRequest) {
     
     // Parse query parameters
     const categoryId = searchParams.get('category_id');
+    const categoryName = searchParams.get('category_name');
     const search = searchParams.get('search');
     const limitParam = searchParams.get('limit');
     const offsetParam = searchParams.get('offset');
@@ -45,52 +44,55 @@ export async function GET(request: NextRequest) {
       offset = parsedOffset;
     }
 
-    // Validate category_id if provided
-    if (categoryId && (isNaN(parseInt(categoryId)) || parseInt(categoryId) < 1)) {
-      return NextResponse.json(
-        { 
-          error: 'Invalid category_id parameter. Must be a positive integer.',
-          code: 'INVALID_CATEGORY_ID' 
-        },
-        { status: 400 }
-      );
-    }
+    // Note: category_id is a UUID string when present; no further validation needed here
 
-    // Build query conditions
-    const conditions = [];
+    const supabase = getSupabaseServer();
 
+    let resolvedCategoryId: string | null = null;
     if (categoryId) {
-      conditions.push(eq(products.categoryId, parseInt(categoryId)));
+      resolvedCategoryId = categoryId;
+    } else if (categoryName) {
+      const { data: cat, error: catErr } = await supabase
+        .from('categories')
+        .select('id')
+        .ilike('name', categoryName)
+        .maybeSingle();
+      if (catErr) {
+        console.error('Category lookup error:', catErr);
+      }
+      resolvedCategoryId = cat?.id ?? null;
     }
 
+    let query = supabase
+      .from('products')
+      .select('id,name,image_url,weight,price,created_at,category_id,categories(name)', { count: 'exact' })
+      .order('created_at', { ascending: false });
+
+    if (resolvedCategoryId) {
+      query = query.eq('category_id', resolvedCategoryId);
+    }
     if (search) {
-      conditions.push(like(products.name, `%${search}%`));
+      query = query.ilike('name', `%${search}%`);
     }
 
-    // Build and execute query with LEFT JOIN to categories
-    let query = db
-      .select({
-        id: products.id,
-        name: products.name,
-        categoryId: products.categoryId,
-        categoryName: categories.name,
-        imageUrl: products.imageUrl,
-        quantity: products.quantity,
-        price: products.price,
-        deliveryTime: products.deliveryTime,
-        createdAt: products.createdAt,
-      })
-      .from(products)
-      .leftJoin(categories, eq(products.categoryId, categories.id))
-      .orderBy(desc(products.createdAt));
-
-    // Apply conditions if any exist
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions));
+    const to = offset + limit - 1;
+    const { data, error } = await query.range(offset, Math.max(offset, to));
+    if (error) {
+      console.error('Supabase products error:', error);
+      return NextResponse.json({ error: error.message, code: 'DB_ERROR' }, { status: 500 });
     }
 
-    // Apply pagination
-    const results = await query.limit(limit).offset(offset);
+    const results = (data ?? []).map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      categoryId: p.category_id,
+      categoryName: p.categories?.name ?? null,
+      imageUrl: p.image_url ?? '',
+      quantity: p.weight ?? '',
+      price: Number(p.price ?? 0),
+      deliveryTime: '8 mins',
+      createdAt: p.created_at,
+    }));
 
     return NextResponse.json(results, { status: 200 });
 
