@@ -12,7 +12,7 @@ export async function GET(
     }
 
     // Validate ID parameter
-    const orderId = params.id;
+    const orderId = await params.id;
     if (!orderId) {
       return NextResponse.json(
         { error: 'Valid order ID is required', code: 'INVALID_ID' },
