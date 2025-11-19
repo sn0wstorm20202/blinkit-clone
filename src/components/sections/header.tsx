@@ -1,78 +1,41 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronDown, Search, ShoppingCart, User, LogOut } from "lucide-react";
+import Image from "next/image";
 import { authClient, useSession } from "@/lib/auth-client";
 import { toast } from "sonner";
+import { safeProductImageUrl } from "@/lib/utils";
 
 const BlinkitLogo = () => (
   <svg
-    width="134"
-    height="30"
-    viewBox="0 0 134 30"
+    width="120"
+    height="32"
+    viewBox="0 0 120 32"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
-    className="h-[27px] w-auto lg:h-[30px]"
+    className="h-[32px] w-auto"
   >
-    <path
-      d="M12.9416 19.1416C12.9416 19.3491 12.7741 19.5166 12.5666 19.5166H10.1509C9.94338 19.5166 9.77588 19.3491 9.77588 19.1416V10.2335C9.77588 10.026 9.94338 9.85852 10.1509 9.85852H12.5666C12.7741 9.85852 12.9416 10.026 12.9416 10.2335V19.1416Z"
-      fill="#F8CB46"
-    />
-    <path
-      d="M22.0993 22.3164C22.0993 22.5239 21.9318 22.6914 21.7243 22.6914H19.3086C19.1011 22.6914 18.9336 22.5239 18.9336 22.3164V7.05859C18.9336 6.85109 19.1011 6.68359 19.3086 6.68359H21.7243C21.9318 6.68359 22.0993 6.85109 22.0993 7.05859V22.3164Z"
-      fill="#0C831F"
-    />
-    <path
-      d="M7.7417 14.6914C7.7417 14.8989 7.5742 15.0664 7.3667 15.0664H2.4334C2.2259 15.0664 2.0584 14.8989 2.0584 14.6914V0.508301H7.7417V14.6914Z"
-      fill="#F8CB46"
-    />
-    <path
-      d="M28.0993 15.0664H32.7836V22.3164C32.7836 22.5239 32.6161 22.6914 32.4086 22.6914H28.4743C28.2668 22.6914 28.0993 22.5239 28.0993 22.3164V15.0664Z"
-      fill="#0C831F"
-    />
-    <path
-      d="M112.549 21.6917C112.934 22.0767 113.564 22.0767 113.949 21.6917L119.349 16.2917C119.734 15.9067 119.734 15.2767 119.349 14.8917C118.964 14.5067 118.334 14.5067 117.949 14.8917L113.249 19.5917L109.949 16.2917C109.564 15.9067 108.934 15.9067 108.549 16.2917C108.164 16.6767 108.164 17.3067 108.549 17.6917L112.549 21.6917Z"
-      fill="#0C831F"
-    />
-    <path
-      d="M125.86 16.03C126.16 16.03 126.4 15.79 126.4 15.49L126.4 10.36C126.4 10.06 126.16 9.82001 125.86 9.82001H123.55C123.25 9.82001 123.01 10.06 123.01 10.36L123.01 19.06C123.01 19.36 123.25 19.6 123.55 19.6H125.86C126.16 19.6 126.4 19.36 126.4 19.06L126.4 16.57H128.05C129.76 16.57 131.02 15.31 131.02 13.57C131.02 11.83 129.76 10.57 128.05 10.57H126.4V12.16H128.05C128.74 12.16 129.31 12.73 129.31 13.57C129.31 14.41 128.74 14.98 128.05 14.98H126.4V16.03H125.86Z"
-      fill="#0C831F"
-    />
-    <path
-      d="M133.4 13.06C133.4 10.95 131.89 9.31001 129.81 9.31001L129.7 9.31001C127.62 9.31001 126.11 10.95 126.11 13.06C126.11 15.2 127.62 16.81 129.7 16.81L129.81 16.81C131.89 16.81 133.4 15.2 133.4 13.06ZM131.69 13.06C131.69 14.28 130.84 15.25 129.7 15.25C128.56 15.25 127.82 14.28 127.82 13.06C127.82 11.87 128.56 10.87 129.7 10.87C130.84 10.87 131.69 11.87 131.69 13.06Z"
-      fill="#0C831F"
-    />
-    <path
-      d="M41.7651 22.4585C40.6751 22.4585 39.7951 22.1085 39.1151 21.4285C38.4351 20.7485 38.0951 19.8385 38.0951 18.7185V7.0585C38.0951 6.851 38.2626 6.6835 38.4701 6.6835H40.8858C41.0933 6.6835 41.2608 6.851 41.2608 7.0585V18.3785C41.2608 18.9185 41.4451 19.3485 41.8151 19.6585C42.1851 19.9685 42.6651 20.1285 43.2551 20.1285C43.8451 20.1285 44.3251 19.9685 44.6951 19.6585C45.0651 19.3485 45.2501 18.9185 45.2501 18.3785V7.0585C45.2501 6.851 45.4176 6.6835 45.6251 6.6835H48.0408C48.2483 6.6835 48.4158 6.851 48.4158 7.0585V18.7185C48.4158 19.8385 48.0758 20.7485 47.3958 21.4285C46.7158 22.1085 45.8358 22.4585 44.7458 22.4585H41.7651Z"
-      fill="#0C831F"
-    />
-    <path
-      d="M57.653 19.2832C57.653 19.4907 57.4855 19.6582 57.278 19.6582H51.053C50.8455 19.6582 50.678 19.4907 50.678 19.2832V7.0582C50.678 6.8507 50.8455 6.6832 51.053 6.6832H57.278C57.4855 6.6832 57.653 6.8507 57.653 7.0582V9.8932H53.053V12.7882H56.553V15.0132H53.053V19.2832Z"
-      fill="#0C831F"
-    />
-    <path
-      d="M68.8164 13.166C68.8164 10.906 67.4364 9.31602 65.4264 9.31602C63.4164 9.31602 62.0364 10.906 62.0364 13.166C62.0364 15.426 63.4164 17.016 65.4264 17.016C67.4364 17.016 68.8164 15.426 68.8164 13.166ZM66.4164 13.166C66.4164 14.396 66.0164 15.116 65.4264 15.116C64.8364 15.116 64.4364 14.396 64.4364 13.166C64.4364 11.936 64.8364 11.216 65.4264 11.216C66.0164 11.216 66.4164 11.936 66.4164 13.166Z"
-      fill="#0C831F"
-    />
-    <path
-      d="M78.6943 19.2832C78.6943 19.4907 78.5268 19.6582 78.3193 19.6582H76.0743C75.8668 19.6582 75.6993 19.4907 75.6993 19.2832V7.0582C75.6993 6.8507 75.8668 6.6832 76.0743 6.6832H78.3193C78.5268 6.6832 78.6943 6.8507 78.6943 7.0582V19.2832Z"
-      fill="#0C831F"
-    />
-    <path
-      d="M91.8021 7.05859C91.8021 6.85109 91.6346 6.68359 91.4271 6.68359H89.0114C88.8039 6.68359 88.6364 6.85109 88.6364 7.05859V22.3164C88.6364 22.5239 88.8039 22.6914 89.0114 22.6914H91.4271C91.6346 22.6914 91.8021 22.5239 91.8021 22.3164V7.05859Z"
-      fill="#0C831F"
-    />
-    <path
-      d="M102.731 16.5236L98.6611 9.94359C98.5011 9.68359 98.1911 9.55359 97.8911 9.66359L95.5311 10.4536C95.2711 10.5436 95.1011 10.7936 95.1011 11.0736V19.2836C95.1011 19.4911 95.2686 19.6586 95.4761 19.6586H97.6911C97.9011 19.6586 98.0711 19.4911 98.0711 19.2836V13.8136L100.241 17.5136C100.821 18.5036 101.991 18.7336 102.821 18.0636L104.221 16.9636C104.911 16.4236 104.751 15.3536 103.921 14.9036L102.731 16.5236Z"
-      fill="#0C831F"
-    />
+    <text x="0" y="26" fontFamily="Arial, sans-serif" fontSize="28" fontWeight="700" letterSpacing="-0.5">
+      <tspan fill="#F8CB46">blink</tspan>
+      <tspan fill="#0C831F">it</tspan>
+    </text>
   </svg>
 );
 
 interface HeaderProps {
   onCartClick?: () => void;
+}
+
+interface Product {
+  id: string;
+  name: string;
+  imageUrl: string;
+  quantity: string;
+  price: number;
+  categoryName: string;
 }
 
 export default function Header({ onCartClick }: HeaderProps) {
@@ -81,6 +44,10 @@ export default function Header({ onCartClick }: HeaderProps) {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [cartItemCount, setCartItemCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<Product[]>([]);
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
   const searchPlaceholders = [ "milk", "bread", "sugar", "butter", "paneer", "chocolate", "curd", "rice", "egg", "chips" ];
   const [currentPlaceholderIndex, setCurrentPlaceholderIndex] = useState(0);
 
@@ -107,6 +74,45 @@ export default function Header({ onCartClick }: HeaderProps) {
     window.addEventListener('cartUpdated', handleCartUpdate);
     return () => window.removeEventListener('cartUpdated', handleCartUpdate);
   }, [session]);
+
+  // Live search with debouncing
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      setShowSearchDropdown(false);
+      return;
+    }
+
+    const delaySearch = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const response = await fetch(`/api/products?search=${encodeURIComponent(searchQuery)}&limit=8`);
+        if (response.ok) {
+          const data = await response.json();
+          setSearchResults(data);
+          setShowSearchDropdown(true);
+        }
+      } catch (error) {
+        console.error('Error searching:', error);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(delaySearch);
+  }, [searchQuery]);
+
+  // Click outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowSearchDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const fetchCartCount = async () => {
     try {
@@ -177,19 +183,89 @@ export default function Header({ onCartClick }: HeaderProps) {
         </div>
 
         <div className="hidden flex-1 items-center justify-center px-8 lg:flex">
-          <form
-            onSubmit={handleSearchSubmit}
-            className="relative flex h-12 w-full max-w-[630px] flex-row items-center rounded-xl bg-surface-gray px-4"
-          >
-            <Search className="h-5 w-5 text-text-tertiary" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={`Search "${searchPlaceholders[currentPlaceholderIndex]}"`}
-              className="ml-3 h-6 w-full flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-secondary focus:outline-none"
-            />
-          </form>
+          <div ref={searchRef} className="relative w-full max-w-[630px]">
+            <form
+              onSubmit={handleSearchSubmit}
+              className="relative flex h-12 w-full flex-row items-center rounded-xl bg-surface-gray px-4"
+            >
+              <Search className="h-5 w-5 text-text-tertiary" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => searchQuery && setShowSearchDropdown(true)}
+                placeholder={`Search "${searchPlaceholders[currentPlaceholderIndex]}"`}
+                className="ml-3 h-6 w-full flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-secondary focus:outline-none"
+              />
+            </form>
+            
+            {/* Search Dropdown */}
+            {showSearchDropdown && searchQuery && (
+              <div className="absolute top-full mt-2 w-full bg-white rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.12)] border border-border max-h-[480px] overflow-y-auto z-50">
+                {isSearching ? (
+                  <div className="p-4 space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="flex gap-3 items-center">
+                        <div className="w-16 h-16 bg-gray-200 rounded-lg animate-pulse" />
+                        <div className="flex-1 space-y-2">
+                          <div className="h-4 bg-gray-200 rounded w-3/4 animate-pulse" />
+                          <div className="h-3 bg-gray-200 rounded w-1/2 animate-pulse" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : searchResults.length > 0 ? (
+                  <div className="py-2">
+                    {searchResults.map((product) => (
+                      <Link
+                        key={product.id}
+                        href={`/category/${encodeURIComponent(product.categoryName)}`}
+                        onClick={() => {
+                          setShowSearchDropdown(false);
+                          setSearchQuery("");
+                        }}
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-surface-gray transition-colors cursor-pointer"
+                      >
+                        <div className="relative w-16 h-16 flex-shrink-0">
+                          <Image
+                            src={safeProductImageUrl(product.imageUrl, product.name)}
+                            alt={product.name}
+                            fill
+                            className="object-contain rounded-lg"
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-text-primary truncate">
+                            {product.name}
+                          </p>
+                          <p className="text-xs text-text-secondary">
+                            {product.quantity}
+                          </p>
+                          <p className="text-sm font-semibold text-text-primary mt-1">
+                            ₹{product.price}
+                          </p>
+                        </div>
+                      </Link>
+                    ))}
+                    <Link
+                      href={`/s?q=${encodeURIComponent(searchQuery)}`}
+                      onClick={() => {
+                        setShowSearchDropdown(false);
+                        setSearchQuery("");
+                      }}
+                      className="block px-4 py-3 text-center text-sm font-medium text-primary hover:bg-surface-gray border-t border-border"
+                    >
+                      View all results
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="p-6 text-center">
+                    <p className="text-sm text-text-secondary">No products found</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-8">

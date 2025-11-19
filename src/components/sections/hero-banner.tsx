@@ -20,12 +20,12 @@ const HeroBanner = () => {
               sizes="(max-width: 768px) 100vw, (max-width: 1280px) 1200px, 1280px"
               className="object-cover object-center"
             />
-            <div className="absolute inset-0 bg-gradient-to-r from-[#2F7A3E] to-transparent opacity-95"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-[#2F7A3E] via-[#2F7A3E]/90 to-transparent"></div>
             <div className="relative z-10 pl-12 pr-4 w-full md:w-3/5 lg:w-1/2">
-              <h1 className="text-white text-[48px] font-bold leading-[56px] tracking-[-0.5px]">
+              <h1 className="text-white text-[48px] font-bold leading-[56px] tracking-[-0.5px] drop-shadow-lg">
                 Paan corner
               </h1>
-              <p className="mt-2 text-xl font-normal text-white">
+              <p className="mt-2 text-xl font-normal text-white drop-shadow-md">
                 Your favourite paan shop is now online
               </p>
               {/* This is a div styled as a button to avoid nested links */}

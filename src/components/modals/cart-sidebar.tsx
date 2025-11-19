@@ -207,14 +207,7 @@ const CartSidebar = ({ isOpen, onClose }: CartSidebarProps) => {
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <SheetContent className="w-full md:w-[400px] p-0 flex flex-col bg-background">
         <SheetHeader className="p-4 border-b border-border space-y-0">
-          <div className="flex justify-between items-center">
-            <SheetTitle className="text-xl font-bold text-text-primary">My Cart</SheetTitle>
-            <SheetClose asChild>
-              <button className="text-text-secondary hover:text-text-primary">
-                <X size={24} />
-              </button>
-            </SheetClose>
-          </div>
+          <SheetTitle className="text-xl font-bold text-text-primary">My Cart</SheetTitle>
         </SheetHeader>
 
         <div className="flex-grow overflow-y-auto">
