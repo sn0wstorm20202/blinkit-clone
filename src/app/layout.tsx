@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
-import VoiceAssistant from "@/components/voice/VoiceAssistant";
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -18,7 +17,6 @@ export default function RootLayout({
       <body>
         {children}
         <Toaster />
-        <VoiceAssistant />
       </body>
     </html>
   );

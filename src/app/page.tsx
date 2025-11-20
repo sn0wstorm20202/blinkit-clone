@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Header from "@/components/sections/header";
 import HeroBanner from "@/components/sections/hero-banner";
 import ServiceCards from "@/components/sections/service-cards";
@@ -13,22 +13,6 @@ import CartSidebar from "@/components/modals/cart-sidebar";
 export default function Home() {
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [isCartSidebarOpen, setIsCartSidebarOpen] = useState(false);
-
-  // Listen for voice command to open cart
-  useEffect(() => {
-    const handleOpenCart = () => setIsCartSidebarOpen(true);
-    window.addEventListener('openCart', handleOpenCart);
-    return () => window.removeEventListener('openCart', handleOpenCart);
-  }, []);
-
-  useEffect(() => {
-    try {
-      if (localStorage.getItem('openCartOnLoad') === '1') {
-        localStorage.removeItem('openCartOnLoad');
-        setIsCartSidebarOpen(true);
-      }
-    } catch {}
-  }, []);
 
   return (
     <div className="min-h-screen bg-background">
@@ -63,7 +47,6 @@ export default function Home() {
         isOpen={isCartSidebarOpen} 
         onClose={() => setIsCartSidebarOpen(false)} 
       />
-      
     </div>
   );
 }

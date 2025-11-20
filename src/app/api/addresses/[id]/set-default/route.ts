@@ -1,13 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAsUser, getUserFromRequest } from '@/lib/supabase/admin';
+import { db } from '@/db';
+import { addresses, session } from '@/db/schema';
+import { eq, and } from 'drizzle-orm';
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const { user, token } = await getUserFromRequest(request);
-    if (!user || !token) {
+    // Authentication: Extract and verify Bearer token
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json(
+        { error: 'Unauthorized', code: 'UNAUTHORIZED' },
+        { status: 401 }
+      );
+    }
+
+    const token = authHeader.substring(7);
+    
+    // Verify session token
+    const userSession = await db
+      .select()
+      .from(session)
+      .where(eq(session.token, token))
+      .limit(1);
+
+    if (userSession.length === 0) {
+      return NextResponse.json(
+        { error: 'Unauthorized', code: 'UNAUTHORIZED' },
+        { status: 401 }
+      );
+    }
+
+    const userId = userSession[0].userId;
+
+    // Check if session is expired
+    if (userSession[0].expiresAt < new Date()) {
       return NextResponse.json(
         { error: 'Unauthorized', code: 'UNAUTHORIZED' },
         { status: 401 }
@@ -23,18 +52,19 @@ export async function PUT(
       );
     }
 
-    const sb = supabaseAsUser(token);
+    // Verify address exists and belongs to authenticated user
+    const existingAddress = await db
+      .select()
+      .from(addresses)
+      .where(
+        and(
+          eq(addresses.id, parseInt(addressId)),
+          eq(addresses.userId, userId)
+        )
+      )
+      .limit(1);
 
-    const { data: existing, error: exErr } = await sb
-      .from('addresses')
-      .select('id')
-      .eq('id', parseInt(addressId))
-      .eq('user_id', user.id)
-      .maybeSingle();
-    if (exErr) {
-      console.error('Address lookup error:', exErr);
-    }
-    if (!existing) {
+    if (existingAddress.length === 0) {
       return NextResponse.json(
         { error: 'Address not found', code: 'NOT_FOUND' },
         { status: 404 }
@@ -43,43 +73,34 @@ export async function PUT(
 
     // Transaction logic:
     // 1. Set all user's addresses to isDefault = false
-    const { error: clearErr } = await sb
-      .from('addresses')
-      .update({ is_default: false })
-      .eq('user_id', user.id);
-    if (clearErr) {
-      console.error('Clear default error:', clearErr);
-    }
+    await db
+      .update(addresses)
+      .set({ isDefault: false })
+      .where(eq(addresses.userId, userId));
 
     // 2. Set specified address to isDefault = true
-    const { data: updated, error: updErr } = await sb
-      .from('addresses')
-      .update({ is_default: true })
-      .eq('id', parseInt(addressId))
-      .eq('user_id', user.id)
-      .select('*')
-      .single();
+    const updatedAddress = await db
+      .update(addresses)
+      .set({ isDefault: true })
+      .where(
+        and(
+          eq(addresses.id, parseInt(addressId)),
+          eq(addresses.userId, userId)
+        )
+      )
+      .returning();
 
-    if (updErr || !updated) {
+    if (updatedAddress.length === 0) {
       return NextResponse.json(
-        { error: updErr?.message || 'Address not found', code: 'NOT_FOUND' },
+        { error: 'Address not found', code: 'NOT_FOUND' },
         { status: 404 }
       );
     }
 
     // Return the updated address with boolean conversion for isDefault
     const responseAddress = {
-      id: updated.id,
-      userId: updated.user_id,
-      fullName: updated.full_name,
-      phoneNumber: updated.phone_number,
-      addressLine1: updated.address_line1,
-      addressLine2: updated.address_line2,
-      city: updated.city,
-      state: updated.state,
-      postalCode: updated.postal_code,
-      isDefault: Boolean(updated.is_default),
-      createdAt: updated.created_at
+      ...updatedAddress[0],
+      isDefault: Boolean(updatedAddress[0].isDefault)
     };
 
     return NextResponse.json(responseAddress, { status: 200 });
