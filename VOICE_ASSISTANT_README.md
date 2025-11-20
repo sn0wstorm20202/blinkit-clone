@@ -135,7 +135,7 @@ VOICE_AGENT_RATE_LIMIT=30
 Works best on:
 - ✅ Chrome/Edge (recommended)
 - ✅ Safari (iOS 14.5+)
-- ⚠️ Firefox (limited Web Speech API support)
+
 
 ## 📊 API Endpoints
 
@@ -157,7 +157,7 @@ Works best on:
 {
   "action": "search_products",
   "params": { "query": "milk" },
-  "response": "Let me search for milk products.",
+  "response": "I am searching for milk products.",
   "conversationState": {
     "state": "adding_items",
     "context": {}
